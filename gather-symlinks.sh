@@ -11,13 +11,16 @@ Usage:
   $gather_symlinks [--help]
   $gather_symlinks [-n|--dry-run] [-v|--verbose]
                    [(--recurisve|--non-recursive)]
+                   [(--deterministic|--non-deterministic)]
 
 Options:
-  -h --help       Show this information
-  -n --dry-run    Simulate actions without changing disk
-  -v --verbose    Show commands that modify the filesystem
-  -r --recursive  [default] Gather symlinks of subdirectories too
-  --non-recursive Do not gather symlinks of subdirectories
+  -h --help           Show this information
+  -n --dry-run        Simulate actions without changing disk
+  -v --verbose        Show commands that modify the filesystem
+  -r --recursive      [default] Gather symlinks of subdirectories too
+  --non-recursive     Do not gather symlinks of subdirectories
+  -d --deterministic  [default] Sort files before acting
+  --non-deterministic Act immediately as each file is scanned
 EOF
 }
 
@@ -26,6 +29,7 @@ PARAMS=""
 DRY_RUN=
 VERBOSE=
 RECURSIVE=
+DETERMINISTIC=
 
 # parse arguments
 while (( "$#" )); do
@@ -58,6 +62,22 @@ while (( "$#" )); do
       RECURSIVE=0
       shift
       ;;
+    -d|--deterministic)
+      if [[ "$DETERMINISTIC" = 0 ]]; then
+        usage >&2 'Error: --deterministic may not be specified with --non-deterministic'
+        exit 1
+      fi
+      DETERMINISTIC=1
+      shift
+      ;;
+    --non-deterministic)
+      if [[ "$DETERMINISTIC" = 1 ]]; then
+        usage >&2 'Error: --deterministic may not be specified with --non-deterministic'
+        exit 1
+      fi
+      DETERMINISTIC=0
+      shift
+      ;;
     #-f|--flag-with-argument)
     #  FARG=$2
     #  shift 2
@@ -83,6 +103,7 @@ eval set -- "$PARAMS"
 DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
 RECURSIVE="${RECURSIVE:-1}"
+DETERMINISTIC="${DETERMINISTIC:-1}"
 
 exec &> >(tee -a ~/gather-all-symlinks.log)
 printf '# Gathering symlinks in %q\n' "$PWD"
@@ -111,7 +132,9 @@ act() {
 }
 
 pwd_canonical="$(realpath -e "$PWD")"
-find . -maxdepth 1 -mindepth 1 -type l -print0 | while read -r -d $'\0' find_file; do
+find . -maxdepth 1 -mindepth 1 -type l -print0 |
+if (( DETERMINISTIC )); then sort -z; else cat; fi |
+while read -r -d $'\0' find_file; do
 # in current directory
   # file: the symlink being processed
   # filetarget: the direct target of the symlink being processed
@@ -158,7 +181,28 @@ find . -maxdepth 1 -mindepth 1 -type l -print0 | while read -r -d $'\0' find_fil
 done
 
 if (( RECURSIVE )); then
-  find . -mindepth 2 -type l -print0 | while read -r -d $'\0' find_file; do
+  find . -mindepth 2 -type l -print0 |
+  if (( DETERMINISTIC )); then
+    sort -z |
+    awk '
+      BEGIN { RS="\0"; FS="/"; depth=0; }
+      {
+        if(NF>depth) { depth=NF }
+        depth_item_count[NF]++
+        depth_items[NF,depth_item_count[NF]]=$0
+      }
+      END {
+        for(d=depth;d>0;d--) {
+          for(r=depth_item_count[d];r>0;r--) {
+            printf "%s\0",depth_items[d,r]
+          }
+        }
+      }
+    '
+  else
+    cat
+  fi |
+  while read -r -d $'\0' find_file; do
     target_canonical_file="$(readlink -e "$find_file")" || {
       # broken symlink
       continue
