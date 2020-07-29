@@ -10,14 +10,14 @@ Recursive by default.
 Usage:
   $gather_symlinks [--help]
   $gather_symlinks [-n|--dry-run] [-v|--verbose]
-                   [(--recurisve|--no-recursive)]
+                   [(--recurisve|--non-recursive)]
 
 Options:
-  -h --help      Show this information
-  -n --dry-run   Simulate actions without changing disk
-  -v --verbose   Show commands that modify the filesystem
-  -r --recursive [default] Gather symlinks of subdirectories too
-  --no-recursive Do not gather symlinks of subdirectories
+  -h --help       Show this information
+  -n --dry-run    Simulate actions without changing disk
+  -v --verbose    Show commands that modify the filesystem
+  -r --recursive  [default] Gather symlinks of subdirectories too
+  --non-recursive Do not gather symlinks of subdirectories
 EOF
 }
 
@@ -44,15 +44,15 @@ while (( "$#" )); do
       ;;
     -r|--recursive)
       if [[ "$RECURSIVE" = 0 ]]; then
-        usage >&2 'Error: --recursive may not be specified with --no-recursive'
+        usage >&2 'Error: --recursive may not be specified with --non-recursive'
         exit 1
       fi
       RECURSIVE=1
       shift
       ;;
-    --no-recursive)
+    --non-recursive)
       if [[ "$RECURSIVE" = 1 ]]; then
-        usage >&2 'Error: --recursive may not be specified with --no-recursive'
+        usage >&2 'Error: --recursive may not be specified with --non-recursive'
         exit 1
       fi
       RECURSIVE=0
