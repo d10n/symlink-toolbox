@@ -102,7 +102,7 @@ fi
 
 act() {
   if (( VERBOSE )); then
-    printf '%q ' "$@"
+    printf '%q ' "$@" | sed 's/ $//'
     printf '\n'
   fi
   if ! (( DRY_RUN )); then
