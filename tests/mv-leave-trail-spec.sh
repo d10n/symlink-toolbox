@@ -14,6 +14,7 @@ before_each() { :
   rm -rf test-mv-leave-trail
   mkdir -p test-mv-leave-trail
   pushd test-mv-leave-trail
+  testing_dir_abs_path="$(pwd -P)"
   mkdir 'test1'
   mkdir 'test1/sub dir1'
   touch 'test1/file1'
@@ -158,6 +159,95 @@ test_mv_abssymdir_to_symdir() { :
   [[ "$src" -ef "$dst/sub dir2" ]] || return 5 # src links to test3
   [[ $(readlink "$src") = '/'* ]] || return 6 # src is a link to an absolute path
   [[ $(readlink "$dst") != '/'* ]] || return 7 # src remains a link to a relative path
+}
+test_mv_twice_only_acts_once() { :;
+  mkdir src1 dst1
+  echo a > src1/a
+  echo 'first invocation'
+  mv-leave-trail src1/a dst1/ || return 1
+  [[ $(readlink src1/a ) = '../dst1/a' ]] || return
+  [[ -f dst1/a ]] || return
+  echo 'second invocation'
+  ! mv-leave-trail src1/a dst1/ || return 2
+  [[ $(readlink src1/a ) = '../dst1/a' ]] || return
+  [[ -f dst1/a ]] || return
+  [[ src1/a -ef dst1/a ]] || return 3
+  [[ "$(cat src1/a)" = a ]] || return 4
+  [[ "$(cat dst1/a)" = a ]] || return 5
+}
+
+test_mv_file_to_dir__file_timestamps_preserved() { :;
+  mkdir src1 dst1
+  echo a > src1/a
+  touch -h --date '@1500000000' src1
+  touch -h --date '@1500000001' dst1
+  touch -h --date '@1500000002' src1/a
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return 5
+
+  mv-leave-trail src1/a dst1
+  ls -ld src1
+  ls -ld src1/*
+  ls -ld dst1
+  ls -ld dst1/*
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return 8
+  [[ "$(stat -c %Y dst1/a)" = 1500000002 ]] || return 9
+}
+
+test_mv_file_to_file__file_timestamps_preserved() { :;
+  mkdir src1 dst1
+  echo a > src1/a
+  touch -h --date '@1500000000' src1
+  touch -h --date '@1500000001' dst1
+  touch -h --date '@1500000002' src1/a
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return 5
+
+  mv-leave-trail src1/a dst1/aa
+  ls -ld src1
+  ls -ld src1/*
+  ls -ld dst1
+  ls -ld dst1/*
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return 8
+  [[ "$(stat -c %Y dst1/aa)" = 1500000002 ]] || return 9
+}
+
+test_mv_file_to_symdir__file_timestamps_preserved() { :;
+  mkdir src1 dst1
+  echo a > src1/a
+  ln -s dst1 dst2
+  touch -h --date '@1500000000' src1
+  touch -h --date '@1500000001' dst1
+  touch -h --date '@1500000002' src1/a
+  touch -h --date '@1500000003' dst2
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return
+
+  mv-leave-trail src1/a dst2
+  ls -ld src1
+  ls -ld src1/*
+  ls -ld dst2
+  ls -ld dst2/*
+  [[ "$(stat -c %Y src1/a)" = 1500000002 ]] || return
+  [[ "$(stat -c %Y dst2/a)" = 1500000002 ]] || return
+  [[ "$(stat -c %Y dst2)" = 1500000003 ]] || return
+}
+
+test_mv_relsymlink_to_dir__dir_already_has_symlink_under_different_name_still_works() { :;
+  mkdir src1 src2 dst1
+  echo a > src1/a
+  ln -s ../src1/a src2/b
+  ln -s ../src1/a dst1/a
+
+  mv-leave-trail src2/b dst1 || return
+  [[ -L dst1/a ]] || return
+  [[ -L dst1/b ]] || return
+}
+
+test_mv_relsymlink_to_dir_slash__set_x_does_not_show_double_slash() { :;
+  mkdir src1 src2 dst1
+  echo a > src1/a
+  ln -s ../src1/a src2/a
+
+  out="$(mv-leave-trail src2/a dst1/)"
+  [[ "$out" = *"+ touch -hmr src2/a.mv-leave-trail.bak ${testing_dir_abs_path}/dst1/a"* ]] || return
 }
 
 . ./bashaspec.sh
