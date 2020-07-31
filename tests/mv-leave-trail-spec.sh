@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -o pipefail
 cd "$(dirname "$0")" || exit 1
 
 mv-leave-trail() {
@@ -80,22 +80,22 @@ test_mv_file_to_file() { :
   [[ "$src" -ef "$dst" ]] || return 3 # a links to dst
   [[ $(readlink "$src") != '/'* ]] || return 4 # src is not a link to an absolute path
 }
-test_mv_file_to_symfile() ( :; set -euo pipefail
+test_mv_file_to_symfile() { :;
   src='test1/sub dir1/space file1'
   dst='test2/sub dir2/space file2a'
   ln -s 'space file2' "$dst"
   yes no | mv-leave-trail "$src" "$dst"
   [[ "$?" -eq 0 ]] && return 1 # dst already existed, should fail
   true
-)
-test_mv_dir_to_symfile() ( :; set -euo pipefail
+}
+test_mv_dir_to_symfile() { :;
   ln -s 'space file2' 'test2/sub dir2/space file2a'
   src='test1/sub dir1'
   dst='test2/sub dir2/space file2a'
   yes no | mv-leave-trail "$src" "$dst"
   [[ "$?" -eq 0 ]] && return 1 # dst already existed, should fail
   true
-)
+}
 test_mv_dir_to_symdir() { :
   mkdir test3
   ln -s '../test2/sub dir2' 'test3/sub dir2'
@@ -108,22 +108,22 @@ test_mv_dir_to_symdir() { :
   [[ "$src" -ef "$dst_result" ]] || return 3 # test1 links to test3
   [[ $(readlink "$src") != '/'* ]] || return 4 # test1 is not a link to an absolute path
 }
-test_mv_dir_to_badsym() ( :; set -euo pipefail
+test_mv_dir_to_badsym() { :;
   ln -s 'space file3' 'test2/sub dir2/space file2a'
   src='test1/sub dir1'
   dst='test2/sub dir2/space file2a'
   yes no | mv-leave-trail "$src" "$dst"
   [[ "$?" -eq 0 ]] && return 1 # dst already existed, should fail
   true
-)
-test_mv_file_to_badsym() ( :; set -euo pipefail
+}
+test_mv_file_to_badsym() { :;
   ln -s 'space file3' 'test2/sub dir2/space file2a'
   src='test1/sub dir1/space file1'
   dst='test2/sub dir2/space file2a'
   yes no | mv-leave-trail "$src" "$dst"
   [[ "$?" -eq 0 ]] && return 1 # dst already existed, should fail
   true
-)
+}
 test_mv_relsymdir_to_symdir() { :
   mkdir 'test3'
   mkdir 'test3/sub dir3'
