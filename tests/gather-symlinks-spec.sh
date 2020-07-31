@@ -515,4 +515,100 @@ EOF
        <(printf %s "$after_files" | sed 's/^[^.]*//;s/ -> .*$//') || return 4
 }
 
+
+test_gather_symlinks_ignores_symlinks_to_directories() {
+  ln -s ../../test2 test1/dir2/test2
+  cd test1/dir2
+  out="$(gather_symlinks_fn)"
+  cd ../..
+  expected_out="$(
+    cat <<EOF
+# Gathering symlinks in ${testing_dir_abs_path}/test1/dir2
+# swapping ./baz <---> ../dir3/baz
+# swapping ./e <---> ../../test2/e
+# swapping ./foo <---> ../dir1/foo
+# swapping ./j <---> ../../test2/j
+EOF
+  )"
+  expected_after_files="$(
+    cat <<EOF
+drwxr-xr-x ./
+drwxr-xr-x ./test1/
+lrwxrwxrwx ./test1/a -> c
+lrwxrwxrwx ./test1/b -> ../test2/a
+lrwxrwxrwx ./test1/baz -> dir2/baz
+-rw-r--r-- ./test1/c
+lrwxrwxrwx ./test1/d -> ../test2/d
+drwxr-xr-x ./test1/dir1/
+lrwxrwxrwx ./test1/dir1/bar -> ../dir2/bar
+lrwxrwxrwx ./test1/dir1/baz -> ../dir3/baz
+lrwxrwxrwx ./test1/dir1/d -> ../../test2/d
+lrwxrwxrwx ./test1/dir1/foo -> ../dir2/foo
+-rw-r--r-- ./test1/dir1/quux
+drwxr-xr-x ./test1/dir2/
+-rw-r--r-- ./test1/dir2/bar
+-rw-r--r-- ./test1/dir2/baz
+-rw-r--r-- ./test1/dir2/e
+-rw-r--r-- ./test1/dir2/foo
+-rw-r--r-- ./test1/dir2/j
+lrwxrwxrwx ./test1/dir2/test2 -> ../../test2
+drwxr-xr-x ./test1/dir3/
+lrwxrwxrwx ./test1/dir3/a space -> ../../test2/a space
+lrwxrwxrwx ./test1/dir3/bar -> ../dir2/bar
+lrwxrwxrwx ./test1/dir3/baz -> ../dir2/baz
+lrwxrwxrwx ./test1/dir3/d -> ../../test2/d
+lrwxrwxrwx ./test1/dir3/f -> ../f
+lrwxrwxrwx ./test1/dir3/foo -> ../dir1/foo
+lrwxrwxrwx ./test1/dir3/i -> ../../test2/a
+lrwxrwxrwx ./test1/dir3/quux -> ../../test2/quux
+-rw-r--r-- ./test1/f
+lrwxrwxrwx ./test1/foo -> dir1/foo
+lrwxrwxrwx ./test1/g -> a
+drwxr-xr-x ./test2/
+lrwxrwxrwx ./test2/a -> a space
+lrwxrwxrwx ./test2/a space -> ../test1/c
+-rw-r--r-- ./test2/d
+lrwxrwxrwx ./test2/e -> ../test1/dir2/e
+lrwxrwxrwx ./test2/j -> ../test1/dir2/j
+lrwxrwxrwx ./test2/quux -> ../test1/dir1/quux
+EOF
+  )"
+
+  after_files="$(find . -exec ls -ogdp --time-style=+ '{}' + | sed 's/1 [^.]*//')"
+
+#  echo "$out"
+#  echo "$after_files"
+
+  (
+    # set -x
+    missing_files=()
+    # All file paths still exist
+    while IFS= read -r file; do
+      { [[ -e "$file" ]] || [[ -L "$file" ]]; } || {
+        missing_files+=( "$(ls -ld "$file")" )
+      }
+    done < <( printf '%s\n' "$before_files" | sed 's/^[^.]*//;s/ -> .*$//';
+            printf '%s\n' "$after_files" | sed 's/^[^.]*//;s/ -> .*$//')
+    [[ "${#missing_files[@]}" -eq 0 ]] || {
+      echo 'Missing files:'
+      printf '%q\n' "${missing_files[@]}"
+      return 4
+    }
+  ) 2>&1 || return $?
+
+
+  # Compare output
+  diff <(printf %s "$out") <(printf %s "$expected_out") || return 99
+  # Compare full state
+  diff <(printf %s "$after_files") <(printf %s "$expected_after_files") || return 96
+
+  broken_links="$(find . -xtype l)"
+  # No broken links
+  [[ -z "$broken_links" ]] || {
+    echo 'Broken links:'
+    printf '%s\n' "$broken_links"
+    return 95
+  }
+}
+
 . ./bashaspec.sh

@@ -132,7 +132,7 @@ act() {
 }
 
 pwd_canonical="$(realpath -e "$PWD")"
-find . -maxdepth 1 -mindepth 1 -type l -print0 |
+find . -maxdepth 1 -mindepth 1 -type l ! -xtype d -print0 |
 if (( DETERMINISTIC )); then sort -z; else cat; fi |
 while read -r -d $'\0' find_file; do
 # in current directory
@@ -181,7 +181,7 @@ while read -r -d $'\0' find_file; do
 done
 
 if (( RECURSIVE )); then
-  find . -mindepth 2 -type l -print0 |
+  find . -mindepth 2 -type l ! -xtype d -print0 |
   if (( DETERMINISTIC )); then
     sort -z |
     awk '
