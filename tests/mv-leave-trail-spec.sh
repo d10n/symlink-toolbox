@@ -1,7 +1,6 @@
 #!/bin/bash
 
 cd "$(dirname "$0")" || exit 1
-. ./bashaspec.sh
 
 mv-leave-trail() {
   ../../mv-leave-trail.sh "$@" 2>&1
@@ -160,3 +159,5 @@ test_mv_abssymdir_to_symdir() { :
   [[ $(readlink "$src") = '/'* ]] || return 6 # src is a link to an absolute path
   [[ $(readlink "$dst") != '/'* ]] || return 7 # src remains a link to a relative path
 }
+
+. ./bashaspec.sh

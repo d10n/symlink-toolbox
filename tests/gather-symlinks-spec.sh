@@ -2,7 +2,6 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 main_dir="$(pwd)"
-. ./bashaspec.sh
 
 before_each() {
   rm -rf test-gather-symlinks
@@ -515,3 +514,5 @@ EOF
   diff <(printf %s "$before_files" | sed 's/^[^.]*//;s/ -> .*$//') \
        <(printf %s "$after_files" | sed 's/^[^.]*//;s/ -> .*$//') || return 4
 }
+
+. ./bashaspec.sh

@@ -25,9 +25,10 @@ run_test_functions() {
   test_r=4; exec 4<"$temp" # Open a read file descriptor
   rm -- "$temp" # Remove the file. The file descriptors remain open and usable.
   echo "1..$(printf '%s\n' "$fns" | grep -c '^test_')"
-  test_index=0; summary_code=0
-  run_fn before_all >&$test_w; bail_if_fail before_all $? "$(cat <&$test_r)"
+  test_index=0; summary_code=0; hook_code=0
+  run_fn before_all >&$test_w || hook_code=$?; bail_if_fail before_all $hook_code "$(cat <&$test_r)"
   while IFS= read -r fn; do
+    [ -n "$fn" ] || continue
     status=; fail=; test_index=$((test_index+1))
     run_fn before_each >&$test_w || { status=$?; fail="$fn before_each"; }
     [ -n "$fail" ] || run_fn "$fn" >&$test_w || { status=$?; fail="$fn"; } # Skip fn if before_each failed
@@ -40,7 +41,7 @@ run_test_functions() {
   done <<FN_EOF
 $(printf %s "$fns" | grep '^test_')
 FN_EOF
-  run_fn after_all >&$test_w; bail_if_fail after_all $? "$(cat <&$test_r)"
+  run_fn after_all >&$test_w || hook_code=$?; bail_if_fail after_all $hook_code "$(cat <&$test_r)"
   return "$summary_code"
 }
 
@@ -61,7 +62,7 @@ bail_if_fail() { # 1=name 2=code 3=output
   [ "$2" -eq 0 ] || {
     echo "Bail out! $1 returned $2"
     [ -z "$3" ] || printf '%s\n' "$3" | sed 's/^/# /'
-    exit "$2"
+    exit 1
   }
 }
 
@@ -90,5 +91,6 @@ sourced=0; [ -n "${BASH_VERSION:-}" ] && ! (return 0 2>/dev/null) || sourced=1
 if [ "$sourced" -eq 0 ]; then
   run_test_files
 else
-  trap 'fns="$(get_functions "${_bashaspec_test_file:-$0}")"; run_test_functions | format; exit $?' EXIT
+  fns="$(get_functions "${_bashaspec_test_file:-$0}")"
+  run_test_functions | format
 fi
